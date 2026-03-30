@@ -1,4 +1,3 @@
-
 # FWHT Sieving for Transformer Weights
 
 A simple post-training experiment that applies Hadamard-domain sieving (thresholding in the FWHT domain) to linear layers of small language models.
@@ -19,17 +18,16 @@ Tested on **SmolLM2-135M** with WikiText-2 perplexity evaluation.
 
 ## Results (SmolLM2-135M)
 
-=======================================================  
-## FINAL PERPLEXITY BENCHMARK                             
-=======================================================  
-1. Baseline (FP32)                    : 20.59
-2. FWHT Domain Sieving                : 24.36
-3. FWHT Spatial Reconstruction        : 24.36
-4. Magnitude Pruning                  : 26.25
-5. Baseline Q16-bit                   : 21.28
-6. FWHT Spatial + Q16-bit             : 25.54
-7. Magnitude Pruning + Q16-bit        : 26.92
-====================================================== 
+| Method                             | Perplexity (↓) |
+|------------------------------------|:---------------|
+| Baseline (FP32)                    | 20.59          |
+| FWHT Domain Sieving (Custom Layer) | 24.36          |
+| FWHT Spatial Reconstruction (FP32) | 24.36          |
+| Magnitude Pruning (70/85%)         | 26.25          |
+| Baseline Q16-bit                   | 21.28          |
+| FWHT Spatial + Q16-bit             | 25.54          |
+| Magnitude Pruning + 16-bit         | 26.92          |
+
 
 *Note: Results are from one-shot post-training pruning without any recovery fine-tuning.*
 
