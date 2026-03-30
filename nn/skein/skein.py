@@ -1,131 +1,144 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import numpy as np
+import torch.nn.functional as F
 
 # --- 0. Hardware Setup ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using compute device: {device}")
 
-# --- 1. The Skein-Convolutional Layer ---
-class SkeinConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1):
-        super(SkeinConv2d, self).__init__()
+# --- 1. The Authentic Skein-Convolutional Layer ---
+class AuthenticSkeinConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3):
+        super(AuthenticSkeinConv, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
 
-        # The three topological states are now spatial filters
-        self.conv_plus = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
-        self.conv_minus = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
-        self.conv_smooth = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
+        # We only define ONE set of weights for the 'positive crossing'
+        self.weight = nn.Parameter(torch.randn(out_channels, in_channels, kernel_size, kernel_size))
+        self.bias = nn.Parameter(torch.zeros(out_channels))
 
-        self.z = nn.Parameter(torch.tensor([1.5]))
+        # Conway's Z parameter (the smoothing coefficient)
+        self.z = nn.Parameter(torch.tensor([1.0]))
+
+        # 1x1 conv to make sure L0 (smoothed) has the right number of channels
+        self.smooth_projector = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.act = nn.LeakyReLU(0.1)
 
     def forward(self, x):
-        lp = self.act(self.conv_plus(x))
-        lm = self.act(self.conv_minus(x))
-        l0 = self.act(self.conv_smooth(x))
+        # L+: The primary learnable filter (Positive Crossing)
+        lp = F.conv2d(x, self.weight, bias=self.bias, padding=1)
 
-        # Conway Spatial Identity: L+ - L- - (z * L0)
-        return lp - lm - (self.z * l0)
+        # L-: The Negative Crossing (Mirrored Weights)
+        # We flip the height and width dims of the kernel to represent the opposite crossing
+        weight_minus = torch.flip(self.weight, dims=[2, 3])
+        lm = F.conv2d(x, weight_minus, bias=self.bias, padding=1)
+
+        # L0: The "Smoothed" state (Topological reconnecting)
+        # We use a Blur/Average pool to simulate the smoothing of the knot
+        l0_raw = F.avg_pool2d(x, kernel_size=3, stride=1, padding=1)
+        l0 = self.smooth_projector(l0_raw)
+
+        # Apply Conway Identity: L+ - L- - (z * L0)
+        # We wrap them in activation to maintain non-linearity
+        return self.act(lp) - self.act(lm) - (self.z * self.act(l0))
 
 # --- 2. The Topological CNN Network ---
 class SkeinCNN(nn.Module):
     def __init__(self):
         super(SkeinCNN, self).__init__()
+        self.skein1 = AuthenticSkeinConv(1, 16)
+        self.pool1 = nn.MaxPool2d(2)
 
-        # Block 1: Input is 1 channel (grayscale) -> Outputs 16 feature maps
-        self.skein1 = SkeinConv2d(in_channels=1, out_channels=16)
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2) # Shrinks 28x28 to 14x14
+        self.skein2 = AuthenticSkeinConv(16, 32)
+        self.pool2 = nn.MaxPool2d(2)
 
-        # Block 2: Takes 16 feature maps -> Outputs 32 feature maps
-        self.skein2 = SkeinConv2d(in_channels=16, out_channels=32)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2) # Shrinks 14x14 to 7x7
-
-        # Final Classification: 32 channels * 7 height * 7 width = 1568
         self.fc = nn.Linear(32 * 7 * 7, 10)
 
     def forward(self, x):
-        # x shape: [Batch, 1, 28, 28] (Standard 2D image)
         x = self.pool1(self.skein1(x))
         x = self.pool2(self.skein2(x))
-
-        # Flatten the 2D feature maps into a 1D vector for the final guessing layer
         x = x.view(x.size(0), -1)
-
         return self.fc(x)
 
 # --- 3. Data Preparation ---
-print("Loading 28x28 Standard MNIST dataset...")
-transform = transforms.Compose([transforms.ToTensor()])
+transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+train_loader = DataLoader(datasets.MNIST('./data', train=True, download=True, transform=transform), batch_size=128, shuffle=True)
+test_loader = DataLoader(datasets.MNIST('./data', train=False, transform=transform), batch_size=128, shuffle=False)
 
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-test_dataset = datasets.MNIST(root='./data', train=False, transform=transform, download=True)
-
-train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
-
-# --- 4. Training Loop ---
+# --- 4. Training ---
 model = SkeinCNN().to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.002)
 criterion = nn.CrossEntropyLoss()
 
-print("Training Skein-CNN Topological Vision Model...")
-epochs = 10
+print(f"Training 'Authentic' Skein-CNN on {device}...")
 
-for epoch in range(epochs):
+for epoch in range(5):
     model.train()
-    total_loss = 0
-
-    for batch_X, batch_y in train_loader:
-        batch_X, batch_y = batch_X.to(device), batch_y.to(device) # Move data to GPU/CPU
-
+    for batch_idx, (data, target) in enumerate(train_loader):
+        data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        out = model(batch_X)
-        loss = criterion(out, batch_y)
+        output = model(data)
+        loss = criterion(output, target)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
 
+    # Quick Eval
     model.eval()
     correct = 0
-    total = 0
     with torch.no_grad():
-        for batch_X, batch_y in test_loader:
-            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            pred = model(data).argmax(dim=1)
+            correct += pred.eq(target).sum().item()
 
-            test_out = model(batch_X)
-            predictions = test_out.argmax(dim=1)
-            correct += (predictions == batch_y).sum().item()
-            total += batch_y.size(0)
+    print(f"Epoch {epoch+1} | Accuracy: {100. * correct / len(test_loader.dataset):.2f}% | Z-val: {model.skein1.z.item():.3f}")
 
-    acc = correct / total
-    avg_loss = total_loss / len(train_loader)
-    print(f"Epoch {epoch+1:2} | Avg Loss: {avg_loss:.4f} | Test Acc: {acc*100:.2f}%")
+# --- 5. Conclusion ---
+print("\nSuccess. The model is now using constrained weights to simulate topological crossings.")
 
-# --- 5. Real Dataset Inference Test (100 Samples) ---
-print("\n--- Skein-CNN Topological MNIST Test (100 Real Samples) ---")
+# --- 6. Real Dataset Inference Test & Evaluation ---
+print("\n" + "="*50)
+print("--- Authentic Skein-CNN Inference Test ---")
+print("="*50)
+
 model.eval()
 
+# Grab a single batch of test data
+dataiter = iter(test_loader)
+images, labels = next(dataiter)
+images, labels = images.to(device), labels.to(device)
+
+# Let's test on the first 15 images of this unseen batch
+num_samples = 15
+test_images = images[:num_samples]
+test_targets = labels[:num_samples]
+
+# Run inference without tracking gradients
 with torch.no_grad():
-    test_loader_100 = DataLoader(test_dataset, batch_size=100, shuffle=True)
-    test_images, test_targets = next(iter(test_loader_100))
-    test_images, test_targets = test_images.to(device), test_targets.to(device)
+    outputs = model(test_images)
+    predictions = outputs.argmax(dim=1)
 
-    predictions = model(test_images).argmax(dim=1)
+# 1. Print the learned Topological/Smoothing weights
+print(f"Final Learned 'Z' Smoothing Weight (Layer 1): {model.skein1.z.item():.4f}")
+print(f"Final Learned 'Z' Smoothing Weight (Layer 2): {model.skein2.z.item():.4f}\n")
 
-    correct = (predictions == test_targets).sum().item()
-    accuracy = (correct / 100.0) * 100
+# 2. Print the prediction table
+print(f"{'Sample':<8} | {'Target':<8} | {'Predicted':<10} | {'Result'}")
+print("-" * 45)
 
-print(f"Accuracy over 100 unseen samples: {accuracy:.2f}%")
-print(f"Final Learned Conway Weight (Z) Layer 1: {model.skein1.z.item():.4f}")
-print(f"Final Learned Conway Weight (Z) Layer 2: {model.skein2.z.item():.4f}\n")
-
-print("Snapshot of first 10 predictions:")
-for i in range(10):
+correct_count = 0
+for i in range(num_samples):
     target = test_targets[i].item()
     pred = predictions[i].item()
-    match = "✅" if target == pred else "❌"
-    print(f"Sample {i+1:2d} | Target: {target} | Predicted: {pred} {match}")
+
+    match = "✅ Match" if target == pred else "❌ Miss"
+    if target == pred:
+        correct_count += 1
+
+    print(f"{i+1:<8} | {target:<8} | {pred:<10} | {match}")
+
+print("-" * 45)
+print(f"Inference Accuracy on this subset: {correct_count}/{num_samples} ({(correct_count/num_samples)*100:.1f}%)")
+print("="*50)
