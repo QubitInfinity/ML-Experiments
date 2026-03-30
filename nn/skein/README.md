@@ -18,6 +18,7 @@ Where the current state and the incoming data row are projected into three matri
 * **z:** A learned parameter balancing the structural tension.
 
 ## The Output:
+```text
 Training 'Authentic' Skein-CNN on cpu...
 Epoch 1 | Accuracy: 96.87% | Z-val: 0.887
 Epoch 2 | Accuracy: 96.91% | Z-val: 0.831
@@ -55,3 +56,4 @@ Inference Accuracy on this subset: 15/15 (100.0%)
 ==================================================
 
 Process finished with exit code 0
+```  
