@@ -74,4 +74,4 @@ The most interesting finding is how the network dynamically adjusted Conway's sm
 
 ### 3. Inference & Generalization
 
-Scoring 15/15 on a random test subset is expected for a model in the 97% range, but it confirms that the architecture generalizes perfectly to unseen data. Rather than memorizing the training set, the network successfully learned a robust, asymmetry-seeking filter.
+Scoring 15/15 on a random test subset is expected for a model in the 97% range, but it confirms that the architecture generalizes to unseen data. Rather than memorizing the training set, the network successfully learned a robust, asymmetry-seeking filter.
