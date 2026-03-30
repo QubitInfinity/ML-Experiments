@@ -20,7 +20,7 @@ Tested on **SmolLM2-135M** with WikiText-2 perplexity evaluation.
 ## Results (SmolLM2-135M)
 
 =======================================================  
-FINAL PERPLEXITY BENCHMARK                           
+## FINAL PERPLEXITY BENCHMARK                             
 =======================================================  
 1. Baseline (FP32)                    : 20.59
 2. FWHT Domain Sieving                : 24.36
