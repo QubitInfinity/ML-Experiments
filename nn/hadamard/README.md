@@ -4,7 +4,7 @@ A simple post-training experiment that applies Hadamard-domain sieving (threshol
 
 ## Overview
 
-This repository contains code to apply **Hadamard-domain sieving** (thresholding in the FWHT domain) to the weights of a pretrained transformer. The goal is to investigate whether spectral decomposition via FWHT can identify structurally important patterns in weight matrices better than standard magnitude-based pruning.
+This repository contains code to apply **Hadamard-domain sieving** (thresholding in the FWHT domain) to the weights of a pretrained transformer. 
 
 Two variants are implemented:
 - **Domain-kept sieving**: Uses a custom `SievedLinear` layer that operates directly in the transformed domain.
