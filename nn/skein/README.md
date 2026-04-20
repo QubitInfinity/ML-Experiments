@@ -1,35 +1,69 @@
 # Skein-CNN: Constrained Mirror-Filter Convolutions
 
-A small PyTorch experiment on MNIST using a custom convolutional block inspired by the **form** of the Conway skein relation.
+A small PyTorch experiment on MNIST using a custom convolutional block inspired by the form of the Conway skein relation.
 
 ## Summary
 
-This repository explores a simple idea:
+This repo tests a simple constrained convolution design:
 
-- apply a learned convolution
-- apply the same convolution with the kernel spatially flipped
-- subtract a smoothed projection of the input
-- learn a scalar `z` controlling the strength of that smoothing term
-
-The result is a **constrained convolutional network**, not a standard CNN and not an RNN.
-
-This project is best understood as an exploratory architecture experiment rather than a mathematically rigorous implementation of knot-theoretic invariants.
-
-## What the model actually is
-
-The network consists of:
-
-- two custom convolutional layers
-- max-pooling after each layer
-- one fully connected output layer
-
-The custom layer computes three branches:
-
-- **L+**: a standard convolution with learned weights
-- **L-**: a convolution using the same kernel flipped across height and width
-- **L0**: a smoothed version of the input produced by average pooling followed by a 1x1 projection
+- `L+`: a learned convolution
+- `L-`: the same kernel flipped spatially
+- `L0`: a smoothed projection of the input
+- `z`: a learned scalar controlling the smoothing penalty
 
 The layer output is:
 
-```text
+~~~text
 LeakyReLU(L+) - LeakyReLU(L-) - z * LeakyReLU(L0)
+~~~
+
+This is a **custom CNN block**, not an RNN and not a rigorous implementation of knot-theoretic invariants.
+
+## Architecture
+
+The model is:
+
+1. `AuthenticSkeinConv(1, 16)`
+2. `MaxPool2d(2)`
+3. `AuthenticSkeinConv(16, 32)`
+4. `MaxPool2d(2)`
+5. `Linear(32 * 7 * 7, 10)`
+
+## Dataset and training
+
+- Dataset: **MNIST**
+- Framework: **PyTorch**
+- Optimizer: **Adam**
+- Loss: **CrossEntropyLoss**
+- Epochs: **5**
+- Batch size: **128**
+
+## Result
+
+In the current run, the model reached **97.69% test accuracy after 5 epochs**.
+
+That suggests the constrained layer can learn useful image features despite the mirrored-filter and smoothing constraints.
+
+## What this is
+
+This project is best described as:
+
+> a constrained CNN using a learned filter, its spatially flipped counterpart, and a learned smoothing penalty
+
+## Limitations
+
+This is an exploratory experiment, not a strong research claim. It does not include:
+
+- a matched baseline run in the repo
+- ablation studies
+- multiple seeds
+- harder datasets
+- evidence that the skein framing adds more than a structural bias
+
+## License
+
+MIT License
+
+## Author
+
+**Russel Maytham**
